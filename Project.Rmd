@@ -9,7 +9,7 @@ output: word_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Project for Myles Hungerford & Elliot Kim
+# Myles Hungerford factor investing project.
 
 # Set up the workspace.
 
