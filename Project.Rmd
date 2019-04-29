@@ -1,0 +1,631 @@
+---
+title: "Project"
+author: "Myles Hungerford"
+date: "November 27, 2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Project for Myles Hungerford & Elliot Kim
+
+# Set up the workspace.
+
+```{r echo=TRUE}
+library(tidyverse)
+library(magrittr)
+library(dplyr)
+if(!file.exists("./Data")){dir.create("./Data")}
+library(readxl)
+Securities <- read_excel("Data/Securities.xlsx")
+Securities <- as.tibble(Securities)
+View(Securities)
+```
+
+# Introduction to factor finance.
+
+The purpose of this project is not to do an in-depth explanation of individual metrics used to evaluate publicly traded companies. More in-depth knowledge of precise definitions can be found on Investopedia, the Motley Fool, or any of the myriad websites dedicated to explaining finance. Instead, our goal is to familiarize the reader with the purpose of each financial metric without going too much into the details and then to analyze whether those metrics still have any predictive value in picking publicly traded companies for higher than average returns. 
+
+This work is a follow up to the book "What Works on Wall Street", by James O'Shaughnessy. James O'Shaughnessy published his book on factor investing in 2008 and owns a company that today manages $7 billion in assets. While we recommend reading the book, we will provide a brief summary here.
+
+Take financial metrics for the entire universe of the stock market and then rank each company according to those metrics. The cheapest price-to-earnings company on the stock market would be ranked first for that metric, and so on down to the most expensive company which would be ranked last. Next divide those ranks into chunks of ten percent each, called deciles. The top decile, or 10%, should outperform the average market return OVER THE LONG RUN. The long run is not defined, but for our purposes ten years has passed since O'Shaughnessy wrote his book and we would like to test what his investment strategies would have returned over those ten years. It should be noted that in his book his specifically pointed out that there were five year periods in which individual factors or metrics underperformed the market average, but with ten years of data we should have a strong idea of whether or not factor based investing still holds merit. 
+
+# Data
+
+All data was downloaded from Bloomberg terminals. This study revolves around the metrics or factors (we use the terms interchangeably) used to measure some aspect of publicly traded companies. The factors can be broken down into three categories:
+
+1. Factors that measure cheapness. Price to Sales, for example, measures the price of the company (market cap) divided by that company's sales over the previous one year period. All else being equal, buying cheaper companies should outperform the market average than buying more expensive companies. The six cheapness factors we use are Price-to-Earnings (PE), Price-to-Book (PB), Price-to-Sales (PS), Price-to-Cashflow (PCF), Enterprise Value to EBIT (EVtoEBIT), and Enterprise Value to EBITDA (EVtoEBITDA).
+
+2. Factors that measure quality. Quality as a term can be a bit nebulous but the theory is that some metrics can serve as instrumental variables for measuring things like management quality or superior products. The Altman Z-Score, for example, is a measure of potential bankruptcy risk in that it takes into account sales, earnings, and debt liabilities. The three quality factors that we use are the Altman Z-Score (AZS), Free Cash Flow Yield (FCF Yld), and Return on Invested Capital (ROIC). We highly recommend reading Altman's 1968 paper on the Z-Score and his updated review of the score in 2012. Joel Greenblatt's book on Return on Invested Capital as a measure of quality is also recommended. 
+
+3. Factors that measure growth or momentum. O'Shaughnessy found that increases in stock price tend to beget further increases in stock price, over the long run. Increasing stock price is indicative of a company growing their revenues, earnings, market share etc. The two growth factors that we use are One Year Return (one_yr_mom) and Six Month Return (six_mo_mom).
+
+# Decile Analysis of Factors
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(PErank = ifelse(is.na(PE), as.integer(NA), order(order(PE))))
+
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(PBrank = ifelse(is.na(PB), as.integer(NA), order(order(PB)))) 
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(PSrank = ifelse(is.na(PS), as.integer(NA), order(order(PS))))
+
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(PCFrank = ifelse(is.na(PCF), as.integer(NA), order(order(PCF)))) 
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(EBITDArank = ifelse(is.na(EVtoEBITDA), as.integer(NA), order(order(EVtoEBITDA))))
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(EBITrank = ifelse(is.na(EVtoEBIT), as.integer(NA), order(order(EVtoEBIT))))
+
+```
+
+Next we take all of our metrics that measure cheapness in one way or another (price to sales, price to cash flow, etc.) and we give each equity a rank by their year. So if General Motors, for example, is the cheapest by Price-to-Earnings in 2008 it will receive rank one for that year. The process repeats for every year with the assumption that we sell our portfolio at the end of every year, repeat the ranking process, and reinvest in the new cheapeast companies the following year. 
+
+Let's then repeat this process for our quality measures:
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(ROICrank = ifelse(is.na(ROIC_LF), as.integer(NA), order(order(ROIC_LF, decreasing = TRUE)))) 
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(FCFrank = ifelse(is.na(FCF_Yld), as.integer(NA), order(order(FCF_Yld, decreasing = TRUE)))) 
+
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(Zrank = ifelse(is.na(AZS), as.integer(NA), order(order(AZS, decreasing = TRUE))))
+
+```
+
+The last thing we need to do is give a rank to the momentum or growth factors for each equity.
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(one_yr_rank = ifelse(is.na(one_yr_mom), as.integer(NA), order(order(one_yr_mom, decreasing = TRUE)))) 
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(six_mo_rank = ifelse(is.na(six_mo_mom), as.integer(NA), order(order(six_mo_mom, decreasing = TRUE)))) 
+```
+
+
+Now that every equity has a rank for every metric, the next step is to break the ranks down into deciles so we can more clearly compare the how the top 10% of each decile compares to the bottom 10% and the average.
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(six_mo_dec = ntile(six_mo_rank, 10))
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(one_yr_dec = ntile(one_yr_rank, 10)) 
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(Z_dec = ntile(Zrank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(FCF_dec = ntile(FCFrank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(ROIC_dec = ntile(ROICrank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(EBIT_dec = ntile(EBITrank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(EBITDA_dec = ntile(EBITDArank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(PCF_dec = ntile(PCFrank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(PS_dec = ntile(PSrank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(PE_dec = ntile(PErank, 10))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(PB_dec = ntile(PBrank, 10))
+```
+
+# Decile Analysis
+
+Now that we have deciles for each factor for each year, we can analyze how those factors did over the last ten years. We are defining success and outperformance as outperforming the average stock return over the last ten years, which is 16%.
+
+```{r echo=TRUE}
+mean(Securities$one_yr_return, na.rm = TRUE)
+```
+
+## Factors that Measure Cheapness
+
+```{r echo=TRUE}
+PE_summary <- Securities %>%
+  group_by(PE_dec) %>%
+  summarise(
+    PE_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_PE = mean(PE, na.rm = TRUE),
+    n = n()
+    )
+ggplot(PE_summary, aes(as.factor(PE_dec), PE_return)) + geom_point(size = 5)
+PE_summary
+```
+
+Price to Earnings ratio looks to be still a significant factor ten years after O'Shaughnessy discussed it in his book, "What Works on Wall Street". The least expensive PE decile (decline 1) returns an average of 19.3% over the last ten years. This is very close to the 18.2% that O'Shaughnessy found when he studied the top decile of Price to Earnings from 1970-2008. 
+
+```{r echo=TRUE}
+PB_summary <- Securities %>%
+  group_by(PB_dec) %>%
+  summarise(
+    PB_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_PB = mean(PB, na.rm = TRUE),
+    n = n()
+    )
+ggplot(PB_summary, aes(as.factor(PB_dec), PB_return)) + geom_point(size = 5)
+PB_summary
+```
+
+The Price to Book metric also looks like it still serves as a good source of outperforming the average. The cheapeast decile had an average return of 21.7% over the past ten years. This is much higher than the 16% average that O'Shaughnessy found for the top price to book ratio decile. 
+
+```{r echo=TRUE}
+PS_summary <- Securities %>%
+  group_by(PS_dec) %>%
+  summarise(
+    PS_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_PS = mean(PS, na.rm = TRUE),
+    n = n()
+    )
+ggplot(PS_summary, aes(as.factor(PS_dec), PS_return)) + geom_point(size = 5)
+PS_summary
+```
+
+The Price to Sales factor displays the best relationship with returns so far. Companies in the cheapeast Price to Sales ration return an average of 27.7% over the previous ten years. This is much higher than the 17% average return that O'Shaughnessy found for the top Price to Sales Ratio. 
+
+```{r echo=TRUE}
+PCF_summary <- Securities %>%
+  group_by(PCF_dec) %>%
+  summarise(
+    PCF_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_PCF = mean(PCF, na.rm = TRUE),
+    n = n()
+    )
+ggplot(PCF_summary, aes(as.factor(PCF_dec), PCF_return)) + geom_point(size = 5)
+PCF_summary
+```
+
+The Price to Cash flow ratio still works fairly well as a good metric to use as well, with the cheapest price to cash flow decile returning 22.9% over the previous ten years. This is much higher than the 18.2% O'Shaughnessy found when he studied the top Price to Cash Flow decile over the previous 40 years. 
+
+```{r echo=TRUE}
+EBITDA_summary <- Securities %>%
+  group_by(EBITDA_dec) %>%
+  summarise(
+    EBITDA_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_EBITDA = mean(EVtoEBITDA, na.rm = TRUE),
+    n = n()
+    )
+ggplot(EBITDA_summary, aes(as.factor(EBITDA_dec), EBITDA_return)) + geom_point(size = 5)
+EBITDA_summary
+```
+
+EBITDA yield looks like there is still a relationship between the EBITDA factor and higher than normal returns, but not quite as strong as other metrics. This is worse that the average return of 18.4% that O'Shaughnessy found for the top decile of EBITDA. 
+
+```{r echo=TRUE}
+EBIT_summary <- Securities %>%
+  group_by(EBIT_dec) %>%
+  summarise(
+    EBIT_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_EBIT = mean(EVtoEBIT, na.rm = TRUE),
+    n = n()
+    )
+ggplot(EBIT_summary, aes(as.factor(EBIT_dec), EBIT_return)) + geom_point(size = 5)
+EBIT_summary
+```
+
+EBIT is even a bit worse than EBITDA is a predictive factor for outperformance. 16.9% average return for the best EBIT decile is only slightly better an the 16% average return for all stocks over the last ten years, which is not what we'd expect to see. 
+
+## Factors that measure quality.
+
+```{r echo=TRUE}
+ROIC_summary <- Securities %>%
+  group_by(ROIC_dec) %>%
+  summarise(
+    ROIC_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_ROIC = mean(ROIC_LF, na.rm = TRUE),
+    n = n()
+    )
+ggplot(ROIC_summary, aes(as.factor(ROIC_dec), ROIC_return)) + geom_point(size = 5)
+ROIC_summary
+```
+
+Return on Invested Capital appears to no longer be useful as a factor for investing. Right now it is unclear why the worst decile of Return on Invested capital would return more, on average, than the best decile. ROIC was first highlighted by Joel Greenblatt in his book as a useful investment factor, but this tells us that ROIC has changed in usefulness over the previous ten years. More research needs to be done to understand why this has changed.
+
+```{r echo=TRUE}
+FCF_summary <- Securities %>%
+  group_by(FCF_dec) %>%
+  summarise(
+    FCF_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_FCF = mean(FCF_Yld, na.rm = TRUE),
+    n = n()
+    )
+ggplot(FCF_summary, aes(as.factor(FCF_dec), FCF_return)) + geom_point(size = 5)
+FCF_summary
+```
+
+Free Cash Flow yield shows a better relationship between rank and returns, though not as strong as some of the others. The top FCF decile returned 18% on average over the last ten years, or 2% more than the average stock. However it appears as if the worst decile in FCF has yielded higher returns on average than the best decile, which is puzzling. 
+
+```{r echo=TRUE}
+Z_summary <- Securities %>%
+  group_by(Z_dec) %>%
+  summarise(
+    Z_return = mean(one_yr_return, na.rm = TRUE),
+    Avg_Z_Score = mean(AZS, na.rm = TRUE),
+    n = n()
+    )
+ggplot(Z_summary, aes(as.factor(Z_dec), Z_return)) + geom_point(size = 5)
+Z_summary
+```
+
+The Altman Z-Score shows a very interestinn relationship between the decile and the average return. The best Z score decile returns 15.9% on average over the previous ten years, which is barely less than the 16% average for all equities. However it appears that worse a Z Score gets the more likely a stock is to outperform the market. 
+
+This is very surprising because Altman created his Z Score specifically to measure bankruptcy risk. This metric has been in use since 1968, so there is a possibility that investment houses and their algorithms have adapted to trading risky companies more efficiently, but these results collectively turn the quality metrics on their head.  
+
+
+## Factors that measure growth or momentum.
+
+```{r echo=TRUE}
+one_yr_summary <- Securities %>%
+  group_by(one_yr_dec) %>%
+  summarise(
+    one_yr_mom_return = mean(one_yr_return, na.rm = TRUE),
+    one_year_momentum = mean(one_yr_mom, na.rm = TRUE),
+    n = n()
+    )
+ggplot(one_yr_summary, aes(as.factor(one_yr_dec), one_yr_mom_return)) + geom_point(size = 5)
+one_yr_summary
+```
+
+```{r echo=TRUE}
+six_mo_summary <- Securities %>%
+  group_by(six_mo_dec) %>%
+  summarise(
+    six_mo_return = mean(one_yr_return, na.rm = TRUE),
+    six_mo_momentum = mean(six_mo_mom, na.rm = TRUE),
+    n = n()
+    )
+ggplot(six_mo_summary, aes(as.factor(six_mo_dec), six_mo_return)) + geom_point(size = 5)
+six_mo_summary
+```
+
+These two results are very interesting because they are the opposite of what O'Shaughnessy found when he researched price momentum as a predictive variable between 1970 and 2008. O'Shaughnessy found that equities with the highest PREVIOUS six and twelve month price increases saw above average returns over the NEXT twelve months. These results show the opposite. The results show that the companies with the greatest price declines have the greatest price increases for the following year. 
+
+# Combination metrics
+
+One of the discoveries O'Shaughnessy made was that combinations of different metrics helped create better returns that using only metric. We will now build and test three different combination metrics: Value, Quality, and Momentum. Value will be the average rank of the six measures of cheapness. Quality will be the average rank of the three measures of quality discussed previously. And momentum will be the average rank of the two growth factors discussed before.
+
+
+## Value Combined Metrics
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  mutate(value_sum = (ifelse(is.na(PBrank), as.integer(1825), PBrank) + 
+                        ifelse(is.na(PSrank), as.integer(1825), PSrank) + 
+                        ifelse(is.na(EBITrank), as.integer(1825), EBITrank) + 
+                        ifelse(is.na(EBITDArank), as.integer(1825), EBITDArank) + 
+                        ifelse(is.na(PErank), as.integer(1825), PErank) + 
+                        ifelse(is.na(PCFrank), as.integer(1825), PCFrank)))
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(value_rank = order(order(value_sum)))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(value_dec = ntile(value_rank, 10))
+
+value_summary <- Securities %>%
+  group_by(value_dec) %>%
+  summarise(
+    value_return = mean(one_yr_return, na.rm = TRUE),
+    avg_value_sum = mean(value_sum, na.rm = TRUE),
+    n = n()
+    )
+ggplot(value_summary, aes(as.factor(value_dec), value_return)) + geom_point(size = 5)
+value_summary
+```
+
+The results are a bit disappointing. The combination of all six measures of cheapness is better than two of the individual measures of cheapness (EBIT and EBITDA) but worse than the other four. 
+
+
+## Quality Combined Metrics
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  mutate(quality_sum = (ifelse(is.na(FCFrank), as.integer(1825), FCFrank) + 
+                          ifelse(is.na(Zrank), as.integer(1825), Zrank) + 
+                          ifelse(is.na(ROICrank), as.integer(1825), ROICrank)))
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(quality_rank = order(order(quality_sum)))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(quality_dec = ntile(quality_rank, 10))
+
+quality_summary <- Securities %>%
+  group_by(quality_dec) %>%
+  summarise(
+    quality_return = mean(one_yr_return, na.rm = TRUE),
+    avg_quality_sum = mean(quality_sum, na.rm = TRUE),
+    n = n()
+    )
+ggplot(quality_summary, aes(as.factor(quality_dec), quality_return)) + geom_point(size = 5)
+quality_summary
+```
+
+The combination of quality metrics does not change the odd results that each individual factor received. Once again the stocks with the worst quality metrics (negative free cash flow, bankruptcy risk, and negative return on invested capital) return higher than the best quality stocks. This is not qhat we would expect, and argues against using these metrics as we might have in the past. 
+
+
+## Momentum Combined Metrics
+
+```{r echo=TRUE}
+Securities <- Securities %>% 
+  mutate(growth_sum = (ifelse(is.na(six_mo_rank), as.integer(1825), six_mo_rank) +
+                         ifelse(is.na(one_yr_rank), as.integer(1825), one_yr_rank)))
+
+Securities <- Securities %>% 
+  group_by(Year) %>% 
+  mutate(growth_rank = order(order(growth_sum)))
+
+Securities <- Securities %>% 
+    group_by(Year) %>% 
+    mutate(growth_dec = ntile(growth_rank, 10))
+
+growth_summary <- Securities %>%
+  group_by(growth_dec) %>%
+  summarise(
+    growth_return = mean(one_yr_return, na.rm = TRUE),
+    n = n()
+    )
+ggplot(growth_summary, aes(as.factor(growth_dec), growth_return)) + geom_point(size = 5)
+growth_summary
+```
+
+Unsurprisingly, a combination of the two growth factors did not improve their predictive power. The "worst" decile is still the best predictor of excess returns, which is not what you'd expect nor what O'Shaughnessy found when he wrote his book. 
+
+# Factors Over time
+
+The final part of our examination is to look at how the tip decile of each factor performs over time relative to the market average. It has been ten years since O'Shaughnessy published his book on factor investing and our hypothesis is that the excess returns of the factors over the stock market should have shrunk during that time because of the advent of quantitative investing by hedge funds.
+
+```{r echo=TRUE}
+PE_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    PE_dec1_return = mean(one_yr_return[PE_dec == 1], na.rm = TRUE),
+    Avg_PE = mean(PE[PE_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (PE_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(PE_over_time_summary, aes(as.factor(Year), PE_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="PE Decile 1 Return", x="Year")
+PE_over_time_summary
+```
+
+This shows that our hypothesis may very well be true. If you only invested in the top decile of PE stocks over the last decade, then the first five years you would have been doing great but you would have been underperforming the market as a whole for the last five years. It could very well be the case that once the research was out in public, quantitative investing took advantage of the arbitrage and erased the low PE return premium.
+
+```{r echo=TRUE}
+PB_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    PB_dec1_return = mean(one_yr_return[PB_dec == 1], na.rm = TRUE),
+    Avg_PB = mean(PB[PB_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (PB_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(PB_over_time_summary, aes(as.factor(Year), PB_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="PB Decile 1 Return", x="Year")
+PB_over_time_summary
+```
+
+Very similar to PE investing, only investing in the top Price to Book decile of companies would have returned 48% over the market average in the first five years of the decade but would have essentially tied the market for the latter half of the decade. It apppears that this arbitrage opportunity might be disappearing as well. 
+
+```{r echo=TRUE}
+PS_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    PS_dec1_return = mean(one_yr_return[PS_dec == 1], na.rm = TRUE),
+    Avg_PS = mean(PS[PS_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (PS_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(PS_over_time_summary, aes(as.factor(Year), PS_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="PS Decile 1 Return", x="Year")
+PS_over_time_summary
+```
+
+Price to Sales as an investing strategy also looks like it has seriously decreased as a viable option. Investors in the top decile of price to sales beat the market by 77% over the first five years since 2008 but only beat the market by 8% in the last half of the decade. 
+
+```{r echo=TRUE}
+PCF_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    PCF_dec1_return = mean(one_yr_return[PCF_dec == 1], na.rm = TRUE),
+    Avg_PCF = mean(PCF[PCF_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (PCF_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(PCF_over_time_summary, aes(as.factor(Year), PCF_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="PCF Decile 1 Return", x="Year")
+PCF_over_time_summary
+```
+
+Price to cash flow looks like it is also decreasing as a viable strategy. Excess returns in the first half of the decade turn into negative returns for the latter half.
+
+```{r echo=TRUE}
+EBIT_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    EBIT_dec1_return = mean(one_yr_return[EBIT_dec == 1], na.rm = TRUE),
+    Avg_EBIT = mean(EVtoEBIT[EBIT_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (EBIT_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(EBIT_over_time_summary, aes(as.factor(Year), EBIT_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="EBIT Decile 1 Return", x="Year")
+EBIT_over_time_summary
+```
+
+Investing in low enterprise value to EBIT stocks seems to be completely worthless as a strategy by the latter half of the decade.
+
+```{r echo=TRUE}
+EBITDA_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    EBITDA_dec1_return = mean(one_yr_return[EBITDA_dec == 1], na.rm = TRUE),
+    Avg_EBITDA = mean(EVtoEBITDA[EBITDA_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (EBITDA_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(EBITDA_over_time_summary, aes(as.factor(Year), EBITDA_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="EBITDA Decile 1 Return", x="Year")
+EBITDA_over_time_summary
+```
+
+EV to EBITDA had 20% of excess returns in the beginning of the decade and became negative by the second half of the decade as well.
+
+```{r echo=TRUE}
+ROIC_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    ROIC_dec1_return = mean(one_yr_return[ROIC_dec == 1], na.rm = TRUE),
+    Avg_ROIC = mean(ROIC_LF[ROIC_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (ROIC_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(ROIC_over_time_summary, aes(as.factor(Year), ROIC_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="ROIC Decile 1 Return", x="Year")
+ROIC_over_time_summary
+```
+
+ROIC as a strategy does not outperform the average stock market return at all. It is worth noting that Joel Greenblatt's research on ROIC came out before O'Shaughnessy's book on value and momentum factors, so perhaps the market already adjusted to ROIC as a factor before 2008.
+
+```{r echo=TRUE}
+FCF_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    FCF_dec1_return = mean(one_yr_return[FCF_dec == 1], na.rm = TRUE),
+    Avg_FCF = mean(FCF_Yld[FCF_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (FCF_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(FCF_over_time_summary, aes(as.factor(Year), FCF_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="FCF Decile 1 Return", x="Year")
+FCF_over_time_summary
+```
+
+Stocks with high free cash flow was also a viable strategy for the first half of the last decade but not the latter.
+
+```{r echo=TRUE}
+Z_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    Z_dec1_return = mean(one_yr_return[Z_dec == 1], na.rm = TRUE),
+    Avg_Z = mean(AZS[Z_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (Z_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(Z_over_time_summary, aes(as.factor(Year), Z_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="Z Decile 1 Return", x="Year")
+Z_over_time_summary
+```
+
+Z scores as an investment strategy, like ROIC, seems to not work to get excess returns over the course of the entire decade. It is work noting that Z Scores have been in use since 1968, so it makes sense that markets have had more than enough time to adapt to their use and erase the advantage from using them.
+
+```{r echo=TRUE}
+six_mo_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    six_mo_dec1_return = mean(one_yr_return[six_mo_dec == 1], na.rm = TRUE),
+    Avg_six_mo = mean(six_mo_mom[six_mo_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (six_mo_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(six_mo_over_time_summary, aes(as.factor(Year), six_mo_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="Six Month Momentum Decile 1 Return", x="Year")
+six_mo_over_time_summary
+```
+
+Six month momentum also appears to have declined as a factor. You can see that in the latter half of the decade the excess return from six month momentum as a factor declines to zero. Here we also find the source of our discrepancy with O'Shaughnessy's previous findings. The highest decile of momentum or growth stocks returned -27% in 2008. These would have been the highest fliers, the companies that had gained the most right as the recession began. It makes sense that these would have been the companies where momentum would have reversed the hardest. 
+
+```{r echo=TRUE}
+one_yr_over_time_summary <- Securities %>%
+  group_by(Year) %>%
+  summarise(
+    one_yr_dec1_return = mean(one_yr_return[one_yr_dec == 1], na.rm = TRUE),
+    Avg_one_yr = mean(one_yr_mom[six_mo_dec == 1], na.rm = TRUE),
+    Avg_Stock_market_return = mean(one_yr_return, na.rm = TRUE),
+    Excess_Return = (one_yr_dec1_return - Avg_Stock_market_return)
+    )
+ggplot(one_yr_over_time_summary, aes(as.factor(Year), one_yr_dec1_return)) + 
+  geom_point(size = 5) +
+  theme_classic() + 
+  labs(y="One Year Momentum Decile 1 Return", x="Year")
+one_yr_over_time_summary
+```
+
+One year momentum shows the same pattern as six month momentum. 
+
+# Conclusion
+
+In the decade since O'Shaughnessy published his book "What Works on Wall Street", it looks like the advantage enjoyed by quantitative investing has slowly disappeared. It is unlikely that the decline in factors' effectiveness has merely coincided with the rise of quantitative funds. The likeliest explanation is that after his research into factor investing was published, other funds began investing to take advantage of the superior returns offered by this style. As quantitative investing became more popular and more crowded over time, it is likely that these advantages have steadily disappeared to the point where it looks like most of the factors no longer offer a superior return over the market average. 
